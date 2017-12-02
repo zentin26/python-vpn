@@ -1,7 +1,7 @@
 from twisted.internet.task import LoopingCall
 from twisted.internet import reactor, protocol
 
-class FrameReciver(protocol.DatagramProtocol):
+class FrameReceiver(protocol.DatagramProtocol):
     """Recieves incoming datagrams and passes them to the server the specificied frame class"""
     def __init__(self, server, frame_class):
         self.server = server
