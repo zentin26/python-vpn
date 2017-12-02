@@ -5,9 +5,7 @@ import time
 import os
 import signal
 import sys
-import src.frame
-from src.l2tp import L2TPServer
-from src.ipsec import IPsecServer
+from src import l2tp, ipsec, frame
 from src import log
 from twisted.internet.task import LoopingCall
 from twisted.internet import reactor, protocol
@@ -29,13 +27,13 @@ def main():
         # initiate everything
         logger.info("Initiating server")
         config = load_config()
-        l2tp_server = L2TPServer(**config['L2TP'])
-        ipsec_server = IPsecServer(**config['IPsec'])
+        l2tp_server = l2tp.L2TPServer(**config['L2TP'])
+        ipsec_server = ipsec.IPsecServer(**config['IPsec'])
 
         # setup and run
         reactor.addSystemEventTrigger('before', 'shutdown', graceful_shutdown)
-        reactor.listenUDP(config['L2TP']['port'], frame.FrameReciver(l2tp_server, frame.L2TPFrame))
-        reactor.listenUDP(config['IPsec']['port'], frame.FrameReciver(ipsec_server, frame.IPsecFrame))
+        reactor.listenUDP(config['L2TP']['port'], frame.FrameReceiver(l2tp_server, l2tp.L2TPFrame))
+        reactor.listenUDP(config['IPsec']['port'], frame.FrameReceiver(ipsec_server, ipsec.IPsecFrame))
         reactor.run()
 
 
