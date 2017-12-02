@@ -1,5 +1,6 @@
 import bitstruct
 import socket
+from .frame import Frame
 from .utils import *
 
 # initiate globals
@@ -84,20 +85,20 @@ class L2TPFrame(Frame):
         
         
     def reply(self, message_type, protocol_version, tunnel_id, session_id, control_sequence_id, expected_control_sequence_id, data=bytearray(), priority=False):
-      # send a response to the frame sender
-      length = 12+len(data)
-      # pack the L2TP header
-      message =  l2tp_header_formatter.pack(message_type, 
-                                            True, 
-                                            True, 
-                                            False, 
-                                            priority, 
-                                            protocol_version, 
-                                            length, 
-                                            tunnel_id, 
-                                            session_id, 
-                                            control_sequence_id, 
-                                            expected_control_sequence_id)
+        # send a response to the frame sender
+        length = 12+len(data)
+        # pack the L2TP header
+        message =  l2tp_header_formatter.pack(message_type, 
+                                              True, 
+                                              True, 
+                                              False, 
+                                              priority, 
+                                              protocol_version, 
+                                              length, 
+                                              tunnel_id, 
+                                              session_id, 
+                                              control_sequence_id, 
+                                              expected_control_sequence_id)
         # append the data
         message += data
         
