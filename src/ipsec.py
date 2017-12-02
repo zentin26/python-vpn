@@ -1,7 +1,7 @@
-from .src import frame
+from .frame import Frame
 
 
-class IPsecFrame(frame.Frame):
+class IPsecFrame(Frame):
     pass
     
     
