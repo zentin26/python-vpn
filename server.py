@@ -5,9 +5,9 @@ import time
 import os
 import signal
 import sys
-import frame
-from l3tp import L2TPServer
-from ipsec import IPsecServer
+import src.frame
+from src.l2tp import L2TPServer
+from src.ipsec import IPsecServer
 from src import log
 from twisted.internet.task import LoopingCall
 from twisted.internet import reactor, protocol
