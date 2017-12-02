@@ -2,6 +2,7 @@ import bitstruct
 import socket
 from .utils import *
 
+# initiate globals
 l2tp_header_formatter = bitstruct.compile('b1b1p2b1p1b1b1p4u4u16u16u16u16u16') 
 avp_header_formatter = bitstruct.compile('b1b1p4u10u16u16')
 
@@ -29,10 +30,11 @@ control_message_types = [(1,  'SCCRQ'),   # Start-Control-Connection-Request
                          (12, 'ICCN'),    # Incoming-Call-Connected
                          (14, 'CDN'),     # Call-Disconnect-Notify
                          (20, 'ACK')      # Explicit Acknowledgement                   
-                         ]
+                         ] # control_message_type, name
                          
                          
 class L2TPFrame(Frame):
+    """The L2TP Frame"""
     avps = {}
 
     def parse_data(self, data):
@@ -49,15 +51,17 @@ class L2TPFrame(Frame):
         self.control_sequence_id, 
         self.expected_control_sequence_id) = l2tp_header_formatter.unpack(data[:12])
         self._data = data[12:]
-        
+       
         if (self.message_type == True) and (len(self._data) != 0):
+            # if this is a control message and it contains an AVP
             avps = self._data
-            print('_data:', self._data)
         
             # format and parse attribute-value pairs
             while len(avps) > 0:
+                # unpack header and AVP value
                 mandatory, hidden, length, vid, attribute_type = avp_header_formatter.unpack(avps[:6])
                 data = avps[6:length]
+                # get the AVP value name and unpack string
                 _, name, fmt = index_tuples(avp_attribute_types, attribute_type)
                 value = bitstruct.unpack(fmt.format(len=8*len(data)), data)
                 if len(value) == 1:
@@ -68,43 +72,51 @@ class L2TPFrame(Frame):
                     # parse control message type
                     _, value = index_tuples(control_message_types, value)
                 
+                # add to frame parsed AVPS
                 self.avps[name] = (name, 
                                    value, 
                                    length, 
                                    vid, 
                                    mandatory, 
                                    hidden)
+                # move onto to next AVP to parse
                 avps = avps[length:]
         
         
     def reply(self, message_type, protocol_version, tunnel_id, session_id, control_sequence_id, expected_control_sequence_id, data=bytearray(), priority=False):
-        length = 12+len(data)
-        message =  l2tp_header_formatter.pack(message_type, 
-                                              True, 
-                                              True, 
-                                              False, 
-                                              priority, 
-                                              protocol_version, 
-                                              length, 
-                                              tunnel_id, 
-                                              session_id, 
-                                              control_sequence_id, 
-                                              expected_control_sequence_id)
+      # send a response to the frame sender
+      length = 12+len(data)
+      # pack the L2TP header
+      message =  l2tp_header_formatter.pack(message_type, 
+                                            True, 
+                                            True, 
+                                            False, 
+                                            priority, 
+                                            protocol_version, 
+                                            length, 
+                                            tunnel_id, 
+                                            session_id, 
+                                            control_sequence_id, 
+                                            expected_control_sequence_id)
+        # append the data
         message += data
         
-        print('message:', message)
-        
+        # send
         self.transport.write(message, self.host)
        
         
 class L2TPServer:
+    """The L2TP server class"""
     def __init__(self, protocol_version, port=1701):
         self.protocol_version = protocol_version
         self.port = port
         self.hostname = socket.gethostname()
+        # send sequence counter
         _ns_counter = 0
+        # expected next recieved counter
         _nr_counter = 1
         
+        # handlers for the various control message types
         self.control_message_handlers = {'SCCRQ':   self.handle_sccrq, 
                                          'SCCCN':   self.handle_scccn, 
                                          'StopCNN': self.handle_stopcnn, 
@@ -117,18 +129,20 @@ class L2TPServer:
 
         
     def format_avps(self, avps):
+        # format the AVPS for response message
         data = bytearray()
         for avp in avps:
+            # get the attribute_type and pack string
             attribute_type, _, fmt = index_tuples(avp_attribute_types, avp[4], 1)
-            avp_value = bitstruct.pack(fmt.format(len=8*len(str(avp[2][0]))), *avp[2])
+            avp_value = bitstruct.pack(fmt.format(len=8*len(str(avp[2][0]))), *avp[2]) # where len is the number of bits of the value
             
-            header = avp_header_formatter.pack(avp[0],                                        # mandatory
-                                             avp[1],                                          # hidden
-                                             6+len(avp_value),                                # length
-                                             avp[3],                                          # vendor id
+            # pack the header
+            header = avp_header_formatter.pack(avp[0],                                       # mandatory
+                                             avp[1],                                         # hidden
+                                             6+len(avp_value),                               # length
+                                             avp[3],                                         # vendor id
                                              index_tuples(avp_attribute_types, avp[4], 1)[0] # message type
                                              )
-            print('avp:', header, 'data:', bitstruct.pack(fmt.format(len=8*len(str(avp[2][0]))), *avp[2]))
             
             data += header
             data += avp_value
@@ -136,26 +150,31 @@ class L2TPServer:
         return data
         
     def handle_frame(self, frame):
+        # handle the frame
         if frame.message_type:
+            # if it is a control message
             if len(frame.avps) != 0:
+                # if it has AVPS
+                self._nr_counter += 1
                 control_message_type = frame.avps['control_message'][1]
                 self.control_message_handlers[control_message_type](frame)
             
         else:
             pass
-            
-        self._nr_counter += 1
+          
         
     def handle_sccrq(self, frame):
-        #print(self.hostname, self.protocol_version, frame.avps['assigned_tunnel_id'])
+        # handle the sccrq message
+        # format the various AVPS
         avps = [(True, False, (index_tuples(control_message_types, 'SCCRP', 1)[0],), 0, 'control_message'),      # message type
                 (True, False, (1, 0),                                                0, 'protocol_version'),     # protocol version
                 (True, False, (False, True),                                         0, 'framing_capabilities'), # framing capabilities
                 (True, False, (self.hostname,),                                      0, 'host_name'),            # system host name
                 (True, False, (frame.avps['assigned_tunnel_id'][1],),                0, 'assigned_tunnel_id')    # tunnel id
-                ]
+                ] # manatory, hidden, value, vendor id, control message type
         data = self.format_avps(avps)
         
+        # send reply
         frame.reply(True, 
                     self.protocol_version, 
                     frame.avps['assigned_tunnel_id'][1], 
@@ -167,6 +186,7 @@ class L2TPServer:
         self._ns_counter += 1
     
     def handle_scccn(self, frame):
+        # handle the scccn message
         frame.reply(True, 
                     self.protocol_version, 
                     frame.avps['assigned_tunnel_id'][1], 
@@ -186,6 +206,7 @@ class L2TPServer:
         pass
         
     def handle_icrq(self, frame):
+        # handle the icrq message
         frame.reply(True, 
                     self.protocol_version, 
                     frame.avps['assigned_tunnel_id'][1], 
@@ -196,6 +217,7 @@ class L2TPServer:
         self._ns_counter += 1
         
     def handle_iccn(self, frame):
+        # handle the iccn message
         frame.reply(True, 
                     self.protocol_version, 
                     frame.avps['assigned_tunnel_id'][1], 
