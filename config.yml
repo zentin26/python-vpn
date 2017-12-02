@@ -1,0 +1,6 @@
+L2TP:
+    port: 1701
+    protocol_version: 2
+    
+IPsec:
+    port: 500
