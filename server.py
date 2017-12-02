@@ -20,6 +20,7 @@ logger = log.get_logger()
 
 def main():
     def graceful_shutdown():
+        # handle the shutdown procedure gracefully
         logger.info("Shutting down server")
         l2tp_server.shutdown()
         ipsec_server.shutdown()
